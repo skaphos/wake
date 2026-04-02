@@ -1,0 +1,11 @@
+apiVersion: repokeeper/v1
+kind: RepoMetadata
+repo_id: github.com/skaphos/wake-core
+name: Wake Core
+labels:
+    kind: component
+    org: skaphos
+    role: core-library
+    tool: wake
+entrypoints:
+    readme: README.md
