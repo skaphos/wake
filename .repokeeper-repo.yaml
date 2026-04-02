@@ -9,3 +9,16 @@ labels:
     tool: wake
 entrypoints:
     readme: README.md
+related_repos:
+    - repo_id: github.com/skaphos/wake-cli
+      relationship: umbrella-for
+    - repo_id: github.com/skaphos/wake-core
+      relationship: umbrella-for
+    - repo_id: github.com/skaphos/wake-adapters
+      relationship: umbrella-for
+    - repo_id: github.com/skaphos/wake-events-mcp
+      relationship: umbrella-for
+    - repo_id: github.com/skaphos/wake-forensics-mcp
+      relationship: umbrella-for
+    - repo_id: github.com/skaphos/wake-inference-mcp
+      relationship: umbrella-for
