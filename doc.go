@@ -1,3 +1,3 @@
 // SPDX-License-Identifier: MIT
 
-package wakecli
+package main
