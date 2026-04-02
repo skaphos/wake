@@ -4,6 +4,8 @@ package events
 
 import "github.com/skaphos/wake-core/evidence"
 
+const SchemaVersion = evidence.SchemaVersion
+
 type Kind string
 
 const (
@@ -14,10 +16,15 @@ const (
 )
 
 type Event struct {
-	Kind         Kind     `json:"kind"`
-	Summary      string   `json:"summary"`
-	EvidenceSHAs []string `json:"evidence_shas,omitempty"`
-	Paths        []string `json:"paths,omitempty"`
+	ID      string      `json:"id"`
+	Kind    Kind        `json:"kind"`
+	Summary string      `json:"summary"`
+	Sources []SourceRef `json:"sources,omitempty"`
+}
+
+type SourceRef struct {
+	CommitSHA string   `json:"commit_sha"`
+	Paths     []string `json:"paths,omitempty"`
 }
 
 type Candidate struct {

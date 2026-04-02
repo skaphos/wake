@@ -2,12 +2,15 @@
 
 package confidence
 
+const SchemaVersion = "wake.skaphos.io/contracts/v1alpha1"
+
 type Band string
 
 const (
-	BandLow    Band = "low"
-	BandMedium Band = "medium"
-	BandHigh   Band = "high"
+	BandUnknown Band = "unknown"
+	BandLow     Band = "low"
+	BandMedium  Band = "medium"
+	BandHigh    Band = "high"
 )
 
 type Caveat struct {
@@ -16,6 +19,7 @@ type Caveat struct {
 }
 
 type Assessment struct {
+	SchemaVersion string   `json:"schema_version"`
 	Band          Band     `json:"band"`
 	EvidenceCount int      `json:"evidence_count"`
 	EvidenceTypes []string `json:"evidence_types,omitempty"`

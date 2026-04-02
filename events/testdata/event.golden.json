@@ -1,0 +1,13 @@
+{
+  "id": "evt-001",
+  "kind": "capability_introduction",
+  "summary": "Introduce confidence contract package",
+  "sources": [
+    {
+      "commit_sha": "def456",
+      "paths": [
+        "confidence/confidence.go"
+      ]
+    }
+  ]
+}

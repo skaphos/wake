@@ -4,6 +4,26 @@ package evidence
 
 import "time"
 
+const SchemaVersion = "wake.skaphos.io/contracts/v1alpha1"
+
+type ChangeKind string
+
+const (
+	ChangeAdd    ChangeKind = "add"
+	ChangeModify ChangeKind = "modify"
+	ChangeDelete ChangeKind = "delete"
+	ChangeRename ChangeKind = "rename"
+)
+
+type ArtifactKind string
+
+const (
+	ArtifactDocumentation ArtifactKind = "documentation"
+	ArtifactConfiguration ArtifactKind = "configuration"
+	ArtifactManifest      ArtifactKind = "manifest"
+	ArtifactGenerated     ArtifactKind = "generated"
+)
+
 type RepositoryTarget struct {
 	Repository   string   `json:"repository"`
 	Subpaths     []string `json:"subpaths,omitempty"`
@@ -22,24 +42,27 @@ type CommitRecord struct {
 	SHA         string              `json:"sha"`
 	Author      ContributorIdentity `json:"author"`
 	AuthoredAt  time.Time           `json:"authored_at"`
+	Parents     []string            `json:"parents,omitempty"`
 	Summary     string              `json:"summary"`
 	TouchedPath []PathDelta         `json:"touched_paths,omitempty"`
 	Artifacts   map[string]Artifact `json:"artifacts,omitempty"`
 }
 
 type PathDelta struct {
-	Path      string `json:"path"`
-	Change    string `json:"change"`
-	Additions int    `json:"additions,omitempty"`
-	Deletions int    `json:"deletions,omitempty"`
+	Path      string     `json:"path"`
+	Change    ChangeKind `json:"change"`
+	Additions int        `json:"additions,omitempty"`
+	Deletions int        `json:"deletions,omitempty"`
 }
 
 type Artifact struct {
-	Kind string `json:"kind"`
-	Path string `json:"path"`
+	Kind ArtifactKind `json:"kind"`
+	Path string       `json:"path"`
 }
 
 type Bundle struct {
-	Target  RepositoryTarget `json:"target"`
-	Commits []CommitRecord   `json:"commits"`
+	SchemaVersion string           `json:"schema_version"`
+	GeneratedAt   time.Time        `json:"generated_at"`
+	Target        RepositoryTarget `json:"target"`
+	Commits       []CommitRecord   `json:"commits"`
 }
