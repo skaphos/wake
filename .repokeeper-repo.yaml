@@ -1,0 +1,11 @@
+apiVersion: repokeeper/v1
+kind: RepoMetadata
+repo_id: github.com/skaphos/wake-events-mcp
+name: Wake Events Mcp
+labels:
+    kind: service
+    org: skaphos
+    role: events-mcp
+    tool: wake
+entrypoints:
+    readme: README.md
