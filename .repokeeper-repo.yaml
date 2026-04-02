@@ -9,3 +9,16 @@ labels:
     tool: wake
 entrypoints:
     readme: README.md
+related_repos:
+    - repo_id: github.com/skaphos/wake
+      relationship: part-of
+    - repo_id: github.com/skaphos/wake-cli
+      relationship: used-by
+    - repo_id: github.com/skaphos/wake-adapters
+      relationship: used-by
+    - repo_id: github.com/skaphos/wake-events-mcp
+      relationship: used-by
+    - repo_id: github.com/skaphos/wake-forensics-mcp
+      relationship: used-by
+    - repo_id: github.com/skaphos/wake-inference-mcp
+      relationship: used-by
