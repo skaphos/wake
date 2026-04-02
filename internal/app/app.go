@@ -3,10 +3,13 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/skaphos/wake-forensics-mcp/internal/config"
 	"github.com/skaphos/wake-forensics-mcp/internal/service"
+	"github.com/skaphos/wake-forensics-mcp/internal/target"
 )
 
 func Run(args []string) error {
@@ -15,8 +18,38 @@ func Run(args []string) error {
 	if err := svc.Validate(); err != nil {
 		return err
 	}
-	if len(args) > 0 && args[0] != "serve" {
+	if len(args) == 0 || args[0] == "serve" {
+		return nil
+	}
+	if args[0] != "resolve" {
 		return fmt.Errorf("unknown command %q", args[0])
 	}
-	return nil
+	if len(args) < 2 {
+		return fmt.Errorf("resolve requires a repository path argument")
+	}
+
+	resolved, err := svc.ResolveTarget(target.Input{Repository: args[1], Subpaths: args[2:]})
+	if err != nil {
+		return err
+	}
+	opened, err := svc.OpenRepository(resolved)
+	if err != nil {
+		return err
+	}
+
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(struct {
+		RepositoryPath string   `json:"repository_path"`
+		GitPath        string   `json:"git_path"`
+		Subpaths       []string `json:"subpaths,omitempty"`
+		RevisionFrom   string   `json:"revision_from,omitempty"`
+		RevisionTo     string   `json:"revision_to,omitempty"`
+	}{
+		RepositoryPath: resolved.RepositoryPath,
+		GitPath:        opened.GitPath,
+		Subpaths:       resolved.Subpaths,
+		RevisionFrom:   resolved.RevisionFrom,
+		RevisionTo:     resolved.RevisionTo,
+	})
 }
