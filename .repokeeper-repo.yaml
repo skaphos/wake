@@ -1,0 +1,11 @@
+apiVersion: repokeeper/v1
+kind: RepoMetadata
+repo_id: github.com/skaphos/wake
+name: Wake
+labels:
+    kind: tool
+    org: skaphos
+    role: umbrella
+    tool: wake
+entrypoints:
+    readme: README.md
