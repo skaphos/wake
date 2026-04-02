@@ -1,0 +1,11 @@
+apiVersion: repokeeper/v1
+kind: RepoMetadata
+repo_id: github.com/skaphos/wake-forensics-mcp
+name: Wake Forensics Mcp
+labels:
+    kind: service
+    org: skaphos
+    role: forensics-mcp
+    tool: wake
+entrypoints:
+    readme: README.md
