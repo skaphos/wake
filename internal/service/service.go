@@ -7,10 +7,10 @@ import (
 	"fmt"
 
 	"github.com/skaphos/wake-core/evidence"
-	"github.com/skaphos/wake-forensics-mcp/internal/commits"
+	"github.com/skaphos/wake-forensics-mcp/commits"
 	"github.com/skaphos/wake-forensics-mcp/internal/config"
-	"github.com/skaphos/wake-forensics-mcp/internal/repository"
-	"github.com/skaphos/wake-forensics-mcp/internal/target"
+	"github.com/skaphos/wake-forensics-mcp/repository"
+	"github.com/skaphos/wake-forensics-mcp/target"
 )
 
 type Service struct {

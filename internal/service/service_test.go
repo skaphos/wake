@@ -12,7 +12,7 @@ import (
 	"github.com/skaphos/wake-core/evidence"
 	"github.com/skaphos/wake-forensics-mcp/internal/config"
 	"github.com/skaphos/wake-forensics-mcp/internal/service"
-	"github.com/skaphos/wake-forensics-mcp/internal/target"
+	"github.com/skaphos/wake-forensics-mcp/target"
 )
 
 func TestResolveTargetAndOpenRepository(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/skaphos/wake-forensics-mcp/internal/target"
+	"github.com/skaphos/wake-forensics-mcp/target"
 )
 
 func TestResolve(t *testing.T) {

@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: MIT
 
+// Package target resolves analysis scope for a Wake forensics run.
+// It accepts an operator-supplied repository path, optional subpaths,
+// and revision window, and returns a normalized, absolute form safe
+// for downstream inspection. It performs no I/O against the repository
+// itself; repository opening is the job of the repository package.
 package target
 
 import (

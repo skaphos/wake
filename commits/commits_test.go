@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/skaphos/wake-core/evidence"
-	"github.com/skaphos/wake-forensics-mcp/internal/commits"
+	"github.com/skaphos/wake-forensics-mcp/commits"
 )
 
 func TestExtractLinearHistory(t *testing.T) {

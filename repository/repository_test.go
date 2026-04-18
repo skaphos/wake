@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/skaphos/wake-forensics-mcp/internal/repository"
+	"github.com/skaphos/wake-forensics-mcp/repository"
 )
 
 func TestOpenReadOnly(t *testing.T) {

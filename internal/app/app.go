@@ -9,7 +9,7 @@ import (
 
 	"github.com/skaphos/wake-forensics-mcp/internal/config"
 	"github.com/skaphos/wake-forensics-mcp/internal/service"
-	"github.com/skaphos/wake-forensics-mcp/internal/target"
+	"github.com/skaphos/wake-forensics-mcp/target"
 )
 
 func Run(args []string) error {
