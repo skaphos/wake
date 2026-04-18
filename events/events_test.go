@@ -27,6 +27,44 @@ func TestEventJSONFixture(t *testing.T) {
 	assertGoldenJSON(t, filepath.Join("testdata", "event.golden.json"), event)
 }
 
+func TestKindsIsStableAndComplete(t *testing.T) {
+	t.Parallel()
+
+	want := []events.Kind{
+		events.KindCapabilityIntroduction,
+		events.KindStructuralRefactor,
+		events.KindOperationalMaintenance,
+		events.KindDocumentationUpdate,
+		events.KindRetirement,
+	}
+
+	got := events.Kinds()
+	if len(got) != len(want) {
+		t.Fatalf("unexpected kind count: want %d, got %d", len(want), len(got))
+	}
+	for i, kind := range want {
+		if got[i] != kind {
+			t.Fatalf("kind at index %d: want %q, got %q", i, kind, got[i])
+		}
+	}
+}
+
+func TestRetirementEventFixture(t *testing.T) {
+	t.Parallel()
+
+	event := events.Event{
+		ID:      "evt-retire-001",
+		Kind:    events.KindRetirement,
+		Summary: "Drop legacy v0 inference helpers",
+		Sources: []events.SourceRef{{
+			CommitSHA: "abc123",
+			Paths:     []string{"inference/v0/helpers.go"},
+		}},
+	}
+
+	assertGoldenJSON(t, filepath.Join("testdata", "event_retirement.golden.json"), event)
+}
+
 func assertGoldenJSON(t *testing.T, fixturePath string, value any) {
 	t.Helper()
 
