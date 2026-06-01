@@ -47,9 +47,13 @@ func renderJSON(w io.Writer, rep Report) error {
 func renderMarkdown(w io.Writer, rep Report) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Wake analyze report\n\n")
-	fmt.Fprintf(&b, "- **Repository:** `%s`\n", rep.Target.Repository)
-	if len(rep.Target.Subpaths) > 0 {
-		fmt.Fprintf(&b, "- **Subpaths:** `%s`\n", strings.Join(rep.Target.Subpaths, "`, `"))
+	if rep.Target.Repository != "" {
+		fmt.Fprintf(&b, "- **Repository:** `%s`\n", rep.Target.Repository)
+		if len(rep.Target.Subpaths) > 0 {
+			fmt.Fprintf(&b, "- **Subpaths:** `%s`\n", strings.Join(rep.Target.Subpaths, "`, `"))
+		}
+	} else {
+		fmt.Fprintf(&b, "- **Repositories:** %d\n", len(rep.Repositories))
 	}
 	fmt.Fprintf(&b, "- **Commits analyzed:** %d\n", rep.TotalCommits)
 	fmt.Fprintf(&b, "- **Classified events:** %d\n", rep.Classified)
@@ -57,6 +61,15 @@ func renderMarkdown(w io.Writer, rep Report) error {
 		fmt.Fprintf(&b, "- **Window:** %s → %s\n", formatDate(rep.WindowStart), formatDate(rep.WindowEnd))
 	}
 	fmt.Fprintf(&b, "- **Generated:** %s\n\n", rep.GeneratedAt.Format(time.RFC3339))
+
+	if len(rep.Repositories) > 1 {
+		fmt.Fprintf(&b, "## Repositories\n\n")
+		fmt.Fprintf(&b, "| Repository | Commits | Events |\n|---|---:|---:|\n")
+		for _, r := range rep.Repositories {
+			fmt.Fprintf(&b, "| `%s` | %d | %d |\n", r.Repository, r.Commits, r.Events)
+		}
+		fmt.Fprintln(&b)
+	}
 
 	fmt.Fprintf(&b, "## Events by kind\n\n")
 	if len(rep.EventsByKind) == 0 {
@@ -111,9 +124,13 @@ func renderText(w io.Writer, rep Report) error {
 	var b strings.Builder
 	fmt.Fprintln(&b, "Wake analyze report")
 	fmt.Fprintln(&b, strings.Repeat("=", 19))
-	fmt.Fprintf(&b, "Repository:        %s\n", rep.Target.Repository)
-	if len(rep.Target.Subpaths) > 0 {
-		fmt.Fprintf(&b, "Subpaths:          %s\n", strings.Join(rep.Target.Subpaths, ", "))
+	if rep.Target.Repository != "" {
+		fmt.Fprintf(&b, "Repository:        %s\n", rep.Target.Repository)
+		if len(rep.Target.Subpaths) > 0 {
+			fmt.Fprintf(&b, "Subpaths:          %s\n", strings.Join(rep.Target.Subpaths, ", "))
+		}
+	} else {
+		fmt.Fprintf(&b, "Repositories:      %d\n", len(rep.Repositories))
 	}
 	fmt.Fprintf(&b, "Commits analyzed:  %d\n", rep.TotalCommits)
 	fmt.Fprintf(&b, "Classified events: %d\n", rep.Classified)

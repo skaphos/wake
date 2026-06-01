@@ -9,22 +9,37 @@ import (
 
 	"github.com/skaphos/wake-core/events"
 	"github.com/skaphos/wake-core/evidence"
+	"github.com/skaphos/wake-events-mcp/classify"
 )
 
 // Report is the shape shown to operators at the end of an analyze
 // run. It is deliberately narrow for the first prerelease: enough to
 // eyeball who is doing what without committing to a rich inference
 // surface that belongs in wake-inference-mcp later.
+//
+// A run may span multiple repositories (a remote author query across an
+// org, or a workspace enumeration). Contributor and event stats are
+// aggregated across all of them; Repositories carries the per-repo
+// breakdown. Target is set only for the single-repository case so the
+// renderers can show a familiar header.
 type Report struct {
-	Target         evidence.RepositoryTarget `json:"target"`
-	GeneratedAt    time.Time                 `json:"generated_at"`
-	WindowStart    time.Time                 `json:"window_start"`
-	WindowEnd      time.Time                 `json:"window_end"`
-	TotalCommits   int                       `json:"total_commits"`
-	Classified     int                       `json:"classified_events"`
-	EventsByKind   []KindCount               `json:"events_by_kind"`
-	Contributors   []ContributorStats        `json:"contributors"`
-	SampleEvents   []events.Event            `json:"sample_events,omitempty"`
+	Target       evidence.RepositoryTarget `json:"target"`
+	Repositories []RepoSummary             `json:"repositories,omitempty"`
+	GeneratedAt  time.Time                 `json:"generated_at"`
+	WindowStart  time.Time                 `json:"window_start"`
+	WindowEnd    time.Time                 `json:"window_end"`
+	TotalCommits int                       `json:"total_commits"`
+	Classified   int                       `json:"classified_events"`
+	EventsByKind []KindCount               `json:"events_by_kind"`
+	Contributors []ContributorStats        `json:"contributors"`
+	SampleEvents []events.Event            `json:"sample_events,omitempty"`
+}
+
+// RepoSummary is the per-repository roll-up in a multi-repo report.
+type RepoSummary struct {
+	Repository string `json:"repository"`
+	Commits    int    `json:"commits"`
+	Events     int    `json:"events"`
 }
 
 type KindCount struct {
@@ -40,23 +55,37 @@ type ContributorStats struct {
 	ByKind       []KindCount `json:"by_kind"`
 }
 
-// BuildReport derives a Report from a forensics bundle and the
-// classifier output. Contributor stats are grouped by canonical email
-// (falling back to canonical name) so that a contributor who shows up
-// with two aliases still appears once — alias normalization proper
-// lives in a later ticket.
-func BuildReport(bundle evidence.Bundle, candidates []events.Candidate, now time.Time) Report {
-	rep := Report{
-		Target:       bundle.Target,
-		GeneratedAt:  now.UTC(),
-		TotalCommits: len(bundle.Commits),
-		Classified:   len(candidates),
+// BuildReport derives a Report from one or more forensics bundles. Each
+// bundle is classified independently (so per-repo counts are accurate), then
+// commits and events are aggregated across all bundles. Contributor stats are
+// grouped by canonical email (falling back to canonical name) so that a
+// contributor who shows up with two aliases still appears once — alias
+// normalization proper lives in a later ticket.
+func BuildReport(bundles []evidence.Bundle, now time.Time) Report {
+	rep := Report{GeneratedAt: now.UTC()}
+
+	var allRecords []evidence.CommitRecord
+	var allCandidates []events.Candidate
+	for _, bundle := range bundles {
+		candidates := classify.Classify(bundle)
+		rep.Repositories = append(rep.Repositories, RepoSummary{
+			Repository: bundle.Target.Repository,
+			Commits:    len(bundle.Commits),
+			Events:     len(candidates),
+		})
+		allRecords = append(allRecords, bundle.Commits...)
+		allCandidates = append(allCandidates, candidates...)
 	}
 
-	rep.WindowStart, rep.WindowEnd = commitWindow(bundle.Commits)
-	rep.EventsByKind = countByKind(candidates)
-	rep.Contributors = aggregateContributors(bundle.Commits, candidates)
-	rep.SampleEvents = sampleEvents(candidates, 10)
+	if len(bundles) == 1 {
+		rep.Target = bundles[0].Target
+	}
+	rep.TotalCommits = len(allRecords)
+	rep.Classified = len(allCandidates)
+	rep.WindowStart, rep.WindowEnd = commitWindow(allRecords)
+	rep.EventsByKind = countByKind(allCandidates)
+	rep.Contributors = aggregateContributors(allRecords, allCandidates)
+	rep.SampleEvents = sampleEvents(allCandidates, 10)
 
 	return rep
 }
