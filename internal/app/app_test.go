@@ -3,6 +3,7 @@
 package app_test
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -28,7 +29,7 @@ func TestRunResolve(t *testing.T) {
 	os.Stdout = w
 	defer func() { os.Stdout = stdout }()
 
-	err = app.Run([]string{"resolve", repoRoot, "internal/service"})
+	err = app.Run(context.Background(), []string{"resolve", repoRoot, "internal/service"})
 	_ = w.Close()
 	if err != nil {
 		t.Fatalf("run resolve: %v", err)
@@ -46,7 +47,7 @@ func TestRunResolve(t *testing.T) {
 func TestRunResolveRequiresRepositoryArgument(t *testing.T) {
 	t.Parallel()
 
-	err := app.Run([]string{"resolve"})
+	err := app.Run(context.Background(), []string{"resolve"})
 	if err == nil {
 		t.Fatal("expected missing repository argument to fail")
 	}
