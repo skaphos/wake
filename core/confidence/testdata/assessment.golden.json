@@ -1,0 +1,19 @@
+{
+  "schema_version": "wake.skaphos.io/contracts/v1alpha1",
+  "band": "high",
+  "evidence_count": 3,
+  "evidence_types": [
+    "commit",
+    "path_delta",
+    "artifact"
+  ],
+  "caveats": [
+    {
+      "code": "incomplete_history_window",
+      "message": "analysis window excludes older commits"
+    }
+  ],
+  "constraints": [
+    "git history is evidence, not final truth"
+  ]
+}

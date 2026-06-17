@@ -1,0 +1,39 @@
+{
+  "schema_version": "wake.skaphos.io/contracts/v1alpha1",
+  "generated_at": "2026-04-02T12:05:00Z",
+  "target": {
+    "repository": "github.com/skaphos/wake-core"
+  },
+  "sections": [
+    {
+      "title": "Evolution Summary",
+      "summary": "Wake core now exposes typed contract packages.",
+      "items": [
+        "evidence",
+        "events",
+        "confidence",
+        "report"
+      ]
+    }
+  ],
+  "events": [
+    {
+      "id": "evt-001",
+      "kind": "capability_introduction",
+      "summary": "Introduce confidence contract package",
+      "sources": [
+        {
+          "commit_sha": "def456",
+          "paths": [
+            "confidence/confidence.go"
+          ]
+        }
+      ]
+    }
+  ],
+  "confidence": {
+    "schema_version": "wake.skaphos.io/contracts/v1alpha1",
+    "band": "high",
+    "evidence_count": 3
+  }
+}
