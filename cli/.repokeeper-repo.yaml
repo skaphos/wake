@@ -1,0 +1,16 @@
+apiVersion: repokeeper/v1
+kind: RepoMetadata
+repo_id: github.com/skaphos/wake-cli
+name: Wake CLI
+labels:
+    kind: component
+    org: skaphos
+    role: cli
+    tool: wake
+entrypoints:
+    readme: README.md
+related_repos:
+    - repo_id: github.com/skaphos/wake
+      relationship: part-of
+    - repo_id: github.com/skaphos/wake-core
+      relationship: depends-on
