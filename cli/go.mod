@@ -7,6 +7,7 @@ require (
 	github.com/cli/go-gh/v2 v2.13.0
 	github.com/cli/oauth v1.2.2
 	github.com/modelcontextprotocol/go-sdk v1.6.1
+	github.com/skaphos/wake-audit-mcp v0.0.0-00010101000000-000000000000
 	github.com/skaphos/wake-core v0.0.0-00010101000000-000000000000
 	github.com/skaphos/wake-events-mcp v0.0.0-00010101000000-000000000000
 	github.com/skaphos/wake-forensics-mcp v0.0.0-00010101000000-000000000000
@@ -29,7 +30,6 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/thlib/go-timezone-local v0.0.0-20210907160436-ef149e42d28e // indirect
@@ -47,3 +47,5 @@ replace github.com/skaphos/wake-core => ../core
 replace github.com/skaphos/wake-forensics-mcp => ../forensics-mcp
 
 replace github.com/skaphos/wake-events-mcp => ../events-mcp
+
+replace github.com/skaphos/wake-audit-mcp => ../audit-mcp

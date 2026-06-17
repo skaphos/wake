@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/skaphos/wake-cli/internal/analyze"
+	"github.com/skaphos/wake-cli/internal/auditcmd"
 	"github.com/skaphos/wake-cli/internal/authcmd"
 	"github.com/skaphos/wake-cli/internal/workspace"
 	"github.com/skaphos/wake-forensics-mcp/source"
@@ -25,6 +26,8 @@ func Run(ctx context.Context, args []string) error {
 	switch args[0] {
 	case "analyze":
 		return runAnalyze(ctx, args[1:], os.Stdout)
+	case "audit":
+		return auditcmd.Run(ctx, args[1:], os.Stdout, os.Stderr)
 	case "auth":
 		return authcmd.Run(ctx, args[1:], os.Stdin, os.Stdout, os.Stderr)
 	case "help", "-h", "--help":
@@ -165,6 +168,10 @@ Commands:
                      wake analyze --remote github ...      remote GitHub/GitLab
                      wake analyze --workspace [--label …]  every matching local
                                                            repo (via RepoKeeper)
+  audit <repo>     Evaluate repository policy adherence against a rule pack
+                   (CI/CD, unit tests, quality gate, deployment intent):
+                     wake audit <path>                    local checkout
+                     wake audit --rules pack.yaml <path>  custom policy pack
   auth <provider>  Authenticate with GitHub or GitLab (OAuth). Subcommands:
                      wake auth github | gitlab | status | logout
   version          Print the CLI version.
