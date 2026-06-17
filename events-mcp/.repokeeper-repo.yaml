@@ -1,0 +1,18 @@
+apiVersion: repokeeper/v1
+kind: RepoMetadata
+repo_id: github.com/skaphos/wake-events-mcp
+name: Wake Events MCP
+labels:
+    kind: service
+    org: skaphos
+    role: events-mcp
+    tool: wake
+entrypoints:
+    readme: README.md
+related_repos:
+    - repo_id: github.com/skaphos/wake
+      relationship: part-of
+    - repo_id: github.com/skaphos/wake-core
+      relationship: depends-on
+    - repo_id: github.com/skaphos/wake-adapters
+      relationship: uses
