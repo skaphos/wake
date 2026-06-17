@@ -42,8 +42,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/skaphos/wake-core => ../wake-core
+replace github.com/skaphos/wake-core => ../core
 
-replace github.com/skaphos/wake-forensics-mcp => ../wake-forensics-mcp
+replace github.com/skaphos/wake-forensics-mcp => ../forensics-mcp
 
-replace github.com/skaphos/wake-events-mcp => ../wake-events-mcp
+replace github.com/skaphos/wake-events-mcp => ../events-mcp

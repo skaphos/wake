@@ -2,7 +2,7 @@ module github.com/skaphos/wake-forensics-mcp
 
 go 1.26.2
 
-replace github.com/skaphos/wake-core => ../wake-core
+replace github.com/skaphos/wake-core => ../core
 
 require (
 	github.com/cli/go-gh/v2 v2.13.0
@@ -18,6 +18,7 @@ require (
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
+	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
