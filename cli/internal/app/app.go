@@ -103,6 +103,7 @@ func runAnalyze(ctx context.Context, args []string, out io.Writer) error {
 	opts := analyze.Options{
 		Format:       analyze.Format(format),
 		Writer:       out,
+		ErrWriter:    os.Stderr,
 		EmitEvidence: emitEvidence,
 	}
 

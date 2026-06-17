@@ -7,6 +7,7 @@ package analyze
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -16,6 +17,27 @@ import (
 	"github.com/skaphos/wake-forensics-mcp/source/local"
 	"github.com/skaphos/wake-forensics-mcp/target"
 )
+
+// Error taxonomy for an analyze run:
+//
+//   - Usage errors (missing writer, no repository/source) are returned
+//     immediately and unwrapped — the run never started.
+//   - SourceFailure is a per-source backend failure (a repository that
+//     could not be opened, a remote query that errored). In multi-source
+//     modes a single SourceFailure does not abort the run: the remaining
+//     sources still produce a report and the failures are surfaced as
+//     diagnostics on Options.ErrWriter (partial results).
+//   - When every source fails, the failures are joined and returned so the
+//     caller exits non-zero — there is nothing to report.
+
+// SourceFailure records one source that failed to yield evidence.
+type SourceFailure struct {
+	Kind string
+	Err  error
+}
+
+func (e *SourceFailure) Error() string { return fmt.Sprintf("%s source: %v", e.Kind, e.Err) }
+func (e *SourceFailure) Unwrap() error { return e.Err }
 
 // Options configures a single analyze run.
 //
@@ -44,7 +66,10 @@ type Options struct {
 
 	Format Format
 	Writer io.Writer
-	Now    func() time.Time
+	// ErrWriter receives partial-results diagnostics (one line per failed
+	// source) when some but not all sources fail. Nil discards them.
+	ErrWriter io.Writer
+	Now       func() time.Time
 }
 
 // Run extracts evidence from the configured source(s), runs the
@@ -72,13 +97,31 @@ func Run(ctx context.Context, opts Options) error {
 		}, opts.IncludeDiffs, 0)}
 	}
 
-	var bundles []evidence.Bundle
+	errw := opts.ErrWriter
+	if errw == nil {
+		errw = io.Discard
+	}
+
+	var (
+		bundles  []evidence.Bundle
+		failures []error
+	)
 	for _, src := range sources {
 		extracted, err := src.Extract(ctx)
 		if err != nil {
-			return fmt.Errorf("extract evidence (%s): %w", src.Kind(), err)
+			failures = append(failures, &SourceFailure{Kind: src.Kind(), Err: err})
+			continue
 		}
 		bundles = append(bundles, extracted...)
+	}
+
+	// Every source failed: nothing to report, surface the joined error.
+	if len(bundles) == 0 && len(failures) > 0 {
+		return fmt.Errorf("all %d source(s) failed: %w", len(failures), errors.Join(failures...))
+	}
+	// Partial success: report proceeds, failures become diagnostics.
+	for _, f := range failures {
+		fmt.Fprintf(errw, "warning: skipped failed source: %v\n", f)
 	}
 
 	if opts.EmitEvidence {
