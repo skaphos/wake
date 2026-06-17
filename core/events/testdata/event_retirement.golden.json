@@ -1,0 +1,13 @@
+{
+  "id": "evt-retire-001",
+  "kind": "retirement",
+  "summary": "Drop legacy v0 inference helpers",
+  "sources": [
+    {
+      "commit_sha": "abc123",
+      "paths": [
+        "inference/v0/helpers.go"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+version = 1
+SPDX-PackageName = "wake-events-mcp"
+SPDX-PackageDownloadLocation = "https://github.com/skaphos/wake-events-mcp"
+
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Skaphos"
+SPDX-License-Identifier = "MIT"
