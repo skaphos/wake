@@ -2,7 +2,7 @@
 
 package main
 
-import "github.com/skaphos/wake-forensics-mcp/cmd/wake-forensics-mcp"
+import wakeforensicsmcp "github.com/skaphos/wake-forensics-mcp/cmd/wake-forensics-mcp"
 
 func main() {
 	wakeforensicsmcp.Execute()
