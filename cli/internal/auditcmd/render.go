@@ -48,9 +48,11 @@ func render(w io.Writer, format string, r audit.RepoReport, packName string) err
 		enc.SetIndent("", "  ")
 		return enc.Encode(struct {
 			RuleSet string           `json:"rule_set"`
+			Layers  []string         `json:"layers,omitempty"`
+			Waivers []audit.Waiver   `json:"waivers,omitempty"`
 			Report  audit.RepoReport `json:"report"`
 			Summary summary          `json:"summary"`
-		}{packName, r, summarize(r)})
+		}{packName, r.Layers, r.Waivers, r, summarize(r)})
 	case "text":
 		return renderText(w, r, packName)
 	default:
@@ -85,6 +87,9 @@ func renderMarkdown(w io.Writer, r audit.RepoReport, packName string) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Policy audit: %s\n\n", r.Repository)
 	fmt.Fprintf(&b, "- Rule pack: `%s`\n", packName)
+	if len(r.Layers) > 1 {
+		fmt.Fprintf(&b, "- Policy layers: %s\n", strings.Join(r.Layers, " ⊕ "))
+	}
 	fmt.Fprintf(&b, "- Classification: **%s** (%s)\n", r.Classification.Archetype, langs(r.Classification.Languages))
 	fmt.Fprintf(&b, "- Summary: **%d hard violation(s)**, %d soft recommendation(s), %d passing, %d n/a, %d unknown\n\n",
 		s.HardViolations, s.SoftRecos, s.Passing, s.NA, s.Unknown)
@@ -95,6 +100,8 @@ func renderMarkdown(w io.Writer, r audit.RepoReport, packName string) error {
 		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n",
 			f.Title, f.Severity, result(f), f.Confidence.Band, mdEscape(evidenceCell(f)))
 	}
+
+	b.WriteString(renderWaivers(r.Waivers))
 
 	fmt.Fprint(&b, "\n")
 	for _, f := range r.Findings {
@@ -110,13 +117,47 @@ func renderText(w io.Writer, r audit.RepoReport, packName string) error {
 	s := summarize(r)
 	var b strings.Builder
 	fmt.Fprintf(&b, "Policy audit: %s  [%s]\n", r.Repository, r.Classification.Archetype)
-	fmt.Fprintf(&b, "  pack=%s  hard-violations=%d soft-recos=%d passing=%d n/a=%d unknown=%d\n\n",
+	fmt.Fprintf(&b, "  pack=%s  hard-violations=%d soft-recos=%d passing=%d n/a=%d unknown=%d\n",
 		packName, s.HardViolations, s.SoftRecos, s.Passing, s.NA, s.Unknown)
+	if len(r.Layers) > 1 {
+		fmt.Fprintf(&b, "  layers=%s\n", strings.Join(r.Layers, " ⊕ "))
+	}
+	fmt.Fprintln(&b)
 	for _, f := range r.Findings {
 		fmt.Fprintf(&b, "  [%-7s] %-10s %s (%s)\n", result(f), f.Severity, f.Title, f.Confidence.Band)
 	}
+	for _, wv := range r.Waivers {
+		title := wv.Title
+		if title == "" {
+			title = wv.ControlID
+		}
+		fmt.Fprintf(&b, "  [waived ] %-10s %s (by %s: %s)\n", "soft", title, wv.Layer, wv.Reason)
+	}
 	_, err := io.WriteString(w, b.String())
 	return err
+}
+
+// renderWaivers renders recorded waivers (soft controls disabled by a policy
+// layer) with their provenance, so a relaxed control stays visible rather than
+// silently dropping out of the findings table.
+func renderWaivers(waivers []audit.Waiver) string {
+	if len(waivers) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "\n**Waived (recorded, not enforced):**\n")
+	for _, wv := range waivers {
+		title := wv.Title
+		if title == "" {
+			title = wv.ControlID
+		}
+		reason := wv.Reason
+		if reason == "" {
+			reason = "no reason given"
+		}
+		fmt.Fprintf(&b, "- %s — waived by `%s`: %s\n", mdEscape(title), mdEscape(wv.Layer), mdEscape(reason))
+	}
+	return b.String()
 }
 
 func langs(l []string) string {
