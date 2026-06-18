@@ -113,28 +113,44 @@ func renderRepo(r audit.RepoReport, packName string) string {
 // headline counts, followed by an aggregate line. truncated reports that the
 // scan was capped before every eligible repo was audited.
 func renderOrg(org, packName string, reports []audit.RepoReport, truncated bool) string {
+	// Build the rows first so the header can report accurate audited/skipped
+	// counts (reports includes skipped entries, which must not inflate the
+	// "audited" total).
 	var total Summary
-	var b strings.Builder
-	fmt.Fprintf(&b, "# Org policy audit: %s\n\n", org)
-	fmt.Fprintf(&b, "- Rule pack: `%s`\n", packName)
-	fmt.Fprintf(&b, "- Repositories audited: %d%s\n\n", len(reports), truncatedNote(truncated))
-
-	fmt.Fprintln(&b, "| Repository | Archetype | Hard | Soft | Pass | N/A | Unknown |")
-	fmt.Fprintln(&b, "|------------|-----------|------|------|------|-----|---------|")
+	var audited, skipped int
+	var rows strings.Builder
 	for _, r := range reports {
 		if r.Skipped {
-			fmt.Fprintf(&b, "| %s | _skipped_ | — | — | — | — | — |\n", mdEscape(r.Repository))
+			skipped++
+			fmt.Fprintf(&rows, "| %s | _skipped_ | — | — | — | — | — |\n", mdEscape(r.Repository))
 			continue
 		}
+		audited++
 		s := summarize(r)
 		total = total.add(s)
-		fmt.Fprintf(&b, "| %s | %s | %d | %d | %d | %d | %d |\n",
+		fmt.Fprintf(&rows, "| %s | %s | %d | %d | %d | %d | %d |\n",
 			mdEscape(r.Repository), r.Classification.Archetype,
 			s.HardViolations, s.SoftRecos, s.Passing, s.NA, s.Unknown)
 	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Org policy audit: %s\n\n", org)
+	fmt.Fprintf(&b, "- Rule pack: `%s`\n", packName)
+	fmt.Fprintf(&b, "- Repositories audited: %d%s%s\n\n", audited, skippedNote(skipped), truncatedNote(truncated))
+
+	fmt.Fprintln(&b, "| Repository | Archetype | Hard | Soft | Pass | N/A | Unknown |")
+	fmt.Fprintln(&b, "|------------|-----------|------|------|------|-----|---------|")
+	b.WriteString(rows.String())
 	fmt.Fprintf(&b, "\n**Org totals:** %d hard violation(s), %d soft recommendation(s), %d passing across %d repositories.\n",
-		total.HardViolations, total.SoftRecos, total.Passing, len(reports))
+		total.HardViolations, total.SoftRecos, total.Passing, audited)
 	return b.String()
+}
+
+func skippedNote(skipped int) string {
+	if skipped > 0 {
+		return fmt.Sprintf(" (%d skipped — unreachable)", skipped)
+	}
+	return ""
 }
 
 func truncatedNote(truncated bool) string {

@@ -44,15 +44,18 @@ type AuditOrgInput struct {
 	Org             string `json:"org" jsonschema:"GitHub organization (or user) whose repositories to audit"`
 	IncludeArchived bool   `json:"include_archived,omitempty" jsonschema:"include archived repositories (excluded by default)"`
 	IncludeForks    bool   `json:"include_forks,omitempty" jsonschema:"include forked repositories (excluded by default)"`
-	MaxRepos        int    `json:"max_repos,omitempty" jsonschema:"cap the number of repositories audited after filtering; 0 uses the server default (300)"`
+	MaxRepos        int    `json:"max_repos,omitempty" jsonschema:"cap the number of repositories audited after filtering; 0 uses the server default (300); a negative value is rejected"`
 	RulesYAML       string `json:"rules_yaml,omitempty" jsonschema:"optional custom rule pack as YAML; defaults to the built-in wake pack"`
 }
 
-// OrgResult is the structured output of audit_org.
+// OrgResult is the structured output of audit_org. ReposAudited counts the
+// repositories that were actually evaluated; ReposSkipped counts those that
+// were enumerated but could not be fetched (their reports carry Skipped).
 type OrgResult struct {
 	Org          string             `json:"org"`
 	RuleSet      string             `json:"rule_set"`
 	ReposAudited int                `json:"repos_audited"`
+	ReposSkipped int                `json:"repos_skipped"`
 	Truncated    bool               `json:"truncated"`
 	Summary      Summary            `json:"summary"`
 	Repositories []audit.RepoReport `json:"repositories"`
@@ -147,6 +150,13 @@ func (h *handler) auditOrg(ctx context.Context, _ *mcp.CallToolRequest, in Audit
 	if in.Org == "" {
 		return errorResult(fmt.Errorf("org is required")), OrgResult{}, nil
 	}
+	if in.MaxRepos < 0 {
+		return errorResult(fmt.Errorf("max_repos must not be negative")), OrgResult{}, nil
+	}
+	max := in.MaxRepos
+	if max == 0 {
+		max = defaultMaxRepos
+	}
 	rs, err := resolveRuleSet(in.RulesYAML)
 	if err != nil {
 		return errorResult(err), OrgResult{}, nil
@@ -162,10 +172,6 @@ func (h *handler) auditOrg(ctx context.Context, _ *mcp.CallToolRequest, in Audit
 	}
 
 	eligible := remote.EligibleRepos(repos, in.IncludeArchived, in.IncludeForks)
-	max := in.MaxRepos
-	if max <= 0 {
-		max = defaultMaxRepos
-	}
 	truncated := false
 	if len(eligible) > max {
 		eligible = eligible[:max]
@@ -174,16 +180,23 @@ func (h *handler) auditOrg(ctx context.Context, _ *mcp.CallToolRequest, in Audit
 
 	reports := make([]audit.RepoReport, 0, len(eligible))
 	var total Summary
+	audited, skipped := 0, 0
 	for _, ref := range eligible {
 		report := auditOne(ctx, api, ref, rs)
-		total = total.add(summarize(report))
+		if report.Skipped {
+			skipped++
+		} else {
+			audited++
+			total = total.add(summarize(report))
+		}
 		reports = append(reports, report)
 	}
 
 	out := OrgResult{
 		Org:          in.Org,
 		RuleSet:      rs.Name,
-		ReposAudited: len(reports),
+		ReposAudited: audited,
+		ReposSkipped: skipped,
 		Truncated:    truncated,
 		Summary:      total,
 		Repositories: reports,

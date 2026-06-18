@@ -158,6 +158,18 @@ func TestAuditOne_FetchErrorBecomesSkip(t *testing.T) {
 	}
 }
 
+func TestAuditOrg_NegativeMaxReposRejected(t *testing.T) {
+	h := &handler{cfg: config.Config{}}
+	// Invalid input must be rejected before any network call.
+	res, _, err := h.auditOrg(context.Background(), nil, AuditOrgInput{Org: "acme", MaxRepos: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.IsError {
+		t.Error("want tool error for negative max_repos")
+	}
+}
+
 func TestResolveRuleSet(t *testing.T) {
 	def, err := resolveRuleSet("")
 	if err != nil {
@@ -189,17 +201,27 @@ func TestRenderOrg_Truncated(t *testing.T) {
 	if !strings.Contains(md, "capped") {
 		t.Errorf("truncated note missing: %q", md)
 	}
+	// One audited + one skipped: the header must report the audited count and
+	// flag the skip, not count the skipped repo as audited.
+	if !strings.Contains(md, "Repositories audited: 1") || !strings.Contains(md, "1 skipped") {
+		t.Errorf("audited/skipped counts wrong: %q", md)
+	}
 }
 
 func TestReadOnlyTools(t *testing.T) {
 	got := ReadOnlyTools()
-	want := map[string]bool{"audit_repository": true, "audit_org": true}
-	if len(got) != len(want) {
-		t.Fatalf("ReadOnlyTools = %v", got)
-	}
+	want := []string{"audit_repository", "audit_org"}
+
+	counts := map[string]int{}
 	for _, n := range got {
-		if !want[n] {
-			t.Errorf("unexpected tool %q", n)
+		counts[n]++
+	}
+	if len(got) != len(want) {
+		t.Fatalf("ReadOnlyTools = %v, want %v", got, want)
+	}
+	for _, n := range want {
+		if counts[n] != 1 {
+			t.Errorf("tool %q appears %d time(s), want exactly 1", n, counts[n])
 		}
 	}
 }
