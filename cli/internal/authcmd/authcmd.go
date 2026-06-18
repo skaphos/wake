@@ -158,7 +158,7 @@ func runLogout(ctx context.Context, args []string, out io.Writer) error {
 	if fs.NArg() > 0 {
 		providerArg = strings.ToLower(fs.Arg(0))
 	}
-	provider := credentials.ProviderGitHub
+	var provider credentials.Provider
 	host := "github.com"
 	switch providerArg {
 	case "", "github":

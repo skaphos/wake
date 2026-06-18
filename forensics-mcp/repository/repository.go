@@ -38,7 +38,7 @@ func OpenReadOnly(root string) (Opened, error) {
 	if err != nil {
 		return Opened{}, fmt.Errorf("repository root %q does not look like a git repository", absRoot)
 	}
-	if !(gitInfo.IsDir() || gitInfo.Mode().IsRegular()) {
+	if !gitInfo.IsDir() && !gitInfo.Mode().IsRegular() {
 		return Opened{}, fmt.Errorf("repository root %q has unsupported .git entry", absRoot)
 	}
 

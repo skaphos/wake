@@ -47,7 +47,7 @@ func Run(ctx context.Context, args []string, out, errw io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("open rule pack: %w", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		if rs, err = audit.LoadRuleSet(f); err != nil {
 			return err
 		}
