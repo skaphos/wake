@@ -1,0 +1,6 @@
+# Normalize line endings to LF for all text files. Several tests compare
+# generated output byte-for-byte against checked-in golden fixtures
+# (core/*/testdata/*.golden.json); without this, Windows checkouts convert the
+# fixtures to CRLF and those comparisons fail. Keeping the working tree LF on
+# every platform keeps such tests deterministic.
+* text=auto eol=lf
