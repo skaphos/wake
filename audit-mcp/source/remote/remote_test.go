@@ -57,16 +57,29 @@ func TestTree_PathsAndLazyCachedReads(t *testing.T) {
 	if !reflect.DeepEqual(tr.Paths(), want) {
 		t.Fatalf("paths = %v, want %v", tr.Paths(), want)
 	}
-	if tr.Repo().Name != "svc" {
-		t.Errorf("repo name = %q", tr.Repo().Name)
+	if tr.Repo().Name != "acme/svc" {
+		t.Errorf("repo name = %q, want owner/name full name", tr.Repo().Name)
 	}
 
-	// Evaluate the default pack. Only the workflow file's content is needed
-	// (the content-scanned controls), and it must be fetched exactly once
-	// despite several controls reading it — proving targeted + cached fetch.
+	// FileTree-level cache: reading the same path twice fetches once. This is
+	// proven at the Tree before any Evaluate, so it does not depend on the
+	// audit engine's own per-evaluation read cache.
+	if _, err := tr.ReadFile(".github/workflows/ci.yml"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tr.ReadFile(".github/workflows/ci.yml"); err != nil {
+		t.Fatal(err)
+	}
+	if api.reads != 1 {
+		t.Errorf("content reads after double ReadFile = %d, want 1 (Tree caches)", api.reads)
+	}
+
+	// Evaluate the default pack. The workflow file is the only content any
+	// control needs and it is already cached, so the whole audit adds no
+	// further fetches — proving targeted (no other files read) + cached.
 	rep := audit.Evaluate(tr, audit.Classify(tr), audit.DefaultRuleSet())
 	if api.reads != 1 {
-		t.Errorf("content reads = %d, want 1 (only the pipeline file, cached across controls)", api.reads)
+		t.Errorf("content reads after audit = %d, want 1 (only the pipeline file, cached across controls)", api.reads)
 	}
 	var ut audit.Finding
 	for _, f := range rep.Findings {

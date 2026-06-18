@@ -72,9 +72,12 @@ func (t *Tree) Truncated() bool { return t.truncated }
 // Paths implements audit.FileTree.
 func (t *Tree) Paths() []string { return t.paths }
 
-// Repo implements audit.FileTree.
+// Repo implements audit.FileTree. Name is the owner/name full name so that
+// org-wide scans — where different owners may share a repo name — stay
+// uniquely identifiable in the report's Repository field (core/audit
+// engine.go uses Repo().Name verbatim).
 func (t *Tree) Repo() audit.RepoInfo {
-	return audit.RepoInfo{Name: t.ref.Name, Archived: t.ref.Archived, Fork: t.ref.Fork}
+	return audit.RepoInfo{Name: t.ref.FullName(), Archived: t.ref.Archived, Fork: t.ref.Fork}
 }
 
 // ReadFile implements audit.FileTree, fetching content lazily and caching it.

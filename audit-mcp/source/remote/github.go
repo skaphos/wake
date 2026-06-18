@@ -19,7 +19,9 @@ type ghAPI struct {
 
 // NewGitHub returns an API backed by GitHub. token may be empty for
 // unauthenticated (public, low-rate-limit) access. baseURL targets a GitHub
-// Enterprise Server instance when non-empty.
+// Enterprise Server instance when non-empty; it must be the API-root URL
+// (e.g. "https://ghe.example.com/api/v3/"), not the web UI base, since it is
+// passed to go-github's WithEnterpriseURLs.
 func NewGitHub(token, baseURL string) (API, error) {
 	c := github.NewClient(nil)
 	if token != "" {
