@@ -1,6 +1,6 @@
 module github.com/skaphos/wake-audit-mcp
 
-go 1.26.2
+go 1.26.4
 
 require (
 	github.com/google/go-github/v82 v82.0.0

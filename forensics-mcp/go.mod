@@ -1,6 +1,6 @@
 module github.com/skaphos/wake-forensics-mcp
 
-go 1.26.2
+go 1.26.4
 
 replace github.com/skaphos/wake-core => ../core
 
