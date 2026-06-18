@@ -117,6 +117,62 @@ func (g *ghAPI) ListOrgRepos(ctx context.Context, org string) ([]RepoRef, error)
 	return out, nil
 }
 
+func (g *ghAPI) ListTeams(ctx context.Context, org string) ([]Team, error) {
+	var out []Team
+	opt := &github.ListOptions{PerPage: 100}
+	for {
+		var teams []*github.Team
+		var resp *github.Response
+		err := withRetry(ctx, func() error {
+			ts, r, e := g.client.Teams.ListTeams(ctx, org, opt)
+			teams, resp = ts, r
+			return e
+		})
+		if err != nil {
+			return nil, fmt.Errorf("list org %q teams: %w", org, err)
+		}
+		for _, t := range teams {
+			out = append(out, Team{Slug: t.GetSlug(), Name: t.GetName()})
+		}
+		if resp == nil || resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+	return out, nil
+}
+
+func (g *ghAPI) ListTeamRepos(ctx context.Context, org, teamSlug string) ([]RepoRef, error) {
+	var out []RepoRef
+	opt := &github.ListOptions{PerPage: 100}
+	for {
+		var repos []*github.Repository
+		var resp *github.Response
+		err := withRetry(ctx, func() error {
+			rs, r, e := g.client.Teams.ListTeamReposBySlug(ctx, org, teamSlug, opt)
+			repos, resp = rs, r
+			return e
+		})
+		if err != nil {
+			return nil, fmt.Errorf("list repos for team %q/%q: %w", org, teamSlug, err)
+		}
+		for _, rp := range repos {
+			out = append(out, RepoRef{
+				Owner:         rp.GetOwner().GetLogin(),
+				Name:          rp.GetName(),
+				DefaultBranch: rp.GetDefaultBranch(),
+				Archived:      rp.GetArchived(),
+				Fork:          rp.GetFork(),
+			})
+		}
+		if resp == nil || resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+	return out, nil
+}
+
 func apiErr(op string, r RepoRef, err error) error {
 	return fmt.Errorf("%s %s: %w", op, r.FullName(), err)
 }

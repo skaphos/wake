@@ -13,10 +13,12 @@ import (
 
 // fakeAPI is an in-memory API for testing the FileTree logic without HTTP.
 type fakeAPI struct {
-	trees   map[string][]string
-	content map[string]map[string]string
-	org     []RepoRef
-	reads   int
+	trees     map[string][]string
+	content   map[string]map[string]string
+	org       []RepoRef
+	reads     int
+	teams     []Team
+	teamRepos map[string][]RepoRef
 }
 
 func (f *fakeAPI) Tree(_ context.Context, r RepoRef) ([]string, bool, error) {
@@ -34,6 +36,12 @@ func (f *fakeAPI) Content(_ context.Context, r RepoRef, p string) ([]byte, error
 
 func (f *fakeAPI) ListOrgRepos(_ context.Context, _ string) ([]RepoRef, error) {
 	return f.org, nil
+}
+
+func (f *fakeAPI) ListTeams(_ context.Context, _ string) ([]Team, error) { return f.teams, nil }
+
+func (f *fakeAPI) ListTeamRepos(_ context.Context, _, teamSlug string) ([]RepoRef, error) {
+	return f.teamRepos[teamSlug], nil
 }
 
 func TestTree_PathsAndLazyCachedReads(t *testing.T) {

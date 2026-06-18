@@ -13,9 +13,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/skaphos/wake-audit-mcp/source/local"
+	"github.com/skaphos/wake-cli/internal/policyfile"
 	"github.com/skaphos/wake-core/audit"
 )
 
@@ -46,11 +46,11 @@ func Run(ctx context.Context, args []string, out, errw io.Writer) error {
 	base := audit.DefaultRuleSet()
 	if rulesPath != "" {
 		var err error
-		if base, err = loadRuleSet(rulesPath); err != nil {
+		if base, err = policyfile.RuleSet(rulesPath); err != nil {
 			return err
 		}
 	}
-	layers, err := loadLayers(orgLayerPath, teamLayerPath)
+	layers, err := policyfile.Layers(orgLayerPath, teamLayerPath)
 	if err != nil {
 		return err
 	}
@@ -65,40 +65,4 @@ func Run(ctx context.Context, args []string, out, errw io.Writer) error {
 	}
 	report := audit.EvaluatePolicy(tree, audit.Classify(tree), ep)
 	return render(out, format, report, ep.RuleSet.Name)
-}
-
-// loadRuleSet opens and decodes a YAML rule pack from path.
-func loadRuleSet(path string) (audit.RuleSet, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return audit.RuleSet{}, fmt.Errorf("open rule pack: %w", err)
-	}
-	defer func() { _ = f.Close() }()
-	rs, err := audit.LoadRuleSet(f)
-	if err != nil {
-		return audit.RuleSet{}, err
-	}
-	return rs, nil
-}
-
-// loadLayers reads the optional org and team policy layers (in that order),
-// skipping any path left empty.
-func loadLayers(orgPath, teamPath string) ([]audit.Layer, error) {
-	var layers []audit.Layer
-	for _, p := range []struct{ role, path string }{{"org", orgPath}, {"team", teamPath}} {
-		if p.path == "" {
-			continue
-		}
-		f, err := os.Open(p.path)
-		if err != nil {
-			return nil, fmt.Errorf("open %s layer: %w", p.role, err)
-		}
-		l, err := audit.LoadLayer(f)
-		_ = f.Close()
-		if err != nil {
-			return nil, fmt.Errorf("%s layer: %w", p.role, err)
-		}
-		layers = append(layers, l)
-	}
-	return layers, nil
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/skaphos/wake-core/audit"
+	"github.com/skaphos/wake-core/ownership"
 )
 
 // Summary aggregates a repo report into compliance counts. It is part of the
@@ -188,6 +189,57 @@ func orgLayers(reports []audit.RepoReport) []string {
 		}
 	}
 	return nil
+}
+
+// renderTeams renders the per-team policy rollup: a table of teams ordered by
+// how many owned repos are out of policy (the headline cut), the offending
+// repos per team, and any audited repos no team owns.
+func renderTeams(org, packName string, rep ownership.Report, truncated bool, layers []string, waivers []audit.Waiver) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Team policy rollup: %s\n\n", org)
+	fmt.Fprintf(&b, "- Rule pack: `%s`\n", packName)
+	if len(layers) > 1 {
+		fmt.Fprintf(&b, "- Policy layers: %s\n", strings.Join(layers, " ⊕ "))
+	}
+	var outOfPolicyTeams int
+	for _, tr := range rep.Teams {
+		if tr.ReposOutOfPolicy > 0 {
+			outOfPolicyTeams++
+		}
+	}
+	fmt.Fprintf(&b, "- Teams: %d (%d own out-of-policy repos)%s\n\n", len(rep.Teams), outOfPolicyTeams, truncatedNote(truncated))
+
+	fmt.Fprintln(&b, "| Team | Repos owned | Audited | Out of policy |")
+	fmt.Fprintln(&b, "|------|-------------|---------|---------------|")
+	for _, tr := range rep.Teams {
+		fmt.Fprintf(&b, "| %s | %d | %d | %d |\n", mdEscape(tr.Team), tr.ReposOwned, tr.ReposAudited, tr.ReposOutOfPolicy)
+	}
+
+	for _, tr := range rep.Teams {
+		if tr.ReposOutOfPolicy == 0 {
+			continue
+		}
+		fmt.Fprintf(&b, "\n**%s** — out of policy:\n", mdEscape(tr.Team))
+		for _, rs := range tr.Repos {
+			if rs.OutOfPolicy {
+				fmt.Fprintf(&b, "- %s (%d hard violation(s))\n", mdEscape(rs.Repository), rs.HardViolations)
+			}
+		}
+	}
+
+	if len(rep.Unowned) > 0 {
+		fmt.Fprintf(&b, "\n**Unowned (no team attribution):**\n")
+		for _, rs := range rep.Unowned {
+			status := "in policy"
+			if rs.OutOfPolicy {
+				status = fmt.Sprintf("%d hard violation(s)", rs.HardViolations)
+			}
+			fmt.Fprintf(&b, "- %s — %s\n", mdEscape(rs.Repository), status)
+		}
+	}
+
+	b.WriteString(renderWaivers(waivers))
+	return b.String()
 }
 
 func skippedNote(skipped int) string {

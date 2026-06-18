@@ -106,10 +106,12 @@ func TestAuditRepository_BadRulePack(t *testing.T) {
 
 // fakeAPI implements remote.API in memory for org/remote tests without HTTP.
 type fakeAPI struct {
-	trees   map[string][]string
-	content map[string]map[string]string
-	org     []remote.RepoRef
-	treeErr map[string]error
+	trees     map[string][]string
+	content   map[string]map[string]string
+	org       []remote.RepoRef
+	treeErr   map[string]error
+	teams     []remote.Team
+	teamRepos map[string][]remote.RepoRef
 }
 
 func (f *fakeAPI) Tree(_ context.Context, r remote.RepoRef) ([]string, bool, error) {
@@ -125,6 +127,14 @@ func (f *fakeAPI) Content(_ context.Context, r remote.RepoRef, p string) ([]byte
 
 func (f *fakeAPI) ListOrgRepos(_ context.Context, _ string) ([]remote.RepoRef, error) {
 	return f.org, nil
+}
+
+func (f *fakeAPI) ListTeams(_ context.Context, _ string) ([]remote.Team, error) {
+	return f.teams, nil
+}
+
+func (f *fakeAPI) ListTeamRepos(_ context.Context, _, teamSlug string) ([]remote.RepoRef, error) {
+	return f.teamRepos[teamSlug], nil
 }
 
 func ciTree() ([]string, map[string]string) {
@@ -210,7 +220,7 @@ func TestRenderOrg_Truncated(t *testing.T) {
 
 func TestReadOnlyTools(t *testing.T) {
 	got := ReadOnlyTools()
-	want := []string{"audit_repository", "audit_org"}
+	want := []string{"audit_repository", "audit_org", "audit_teams"}
 
 	counts := map[string]int{}
 	for _, n := range got {
