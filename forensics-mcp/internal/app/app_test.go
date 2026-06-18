@@ -4,10 +4,11 @@ package app_test
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
+	"slices"
 	"testing"
 
 	"github.com/skaphos/wake-forensics-mcp/internal/app"
@@ -39,8 +40,18 @@ func TestRunResolve(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read output: %v", err)
 	}
-	if !strings.Contains(string(data), filepath.Join("internal", "service")) {
-		t.Fatalf("output %q did not contain resolved subpath", string(data))
+	// Decode rather than substring-match: subpaths use the OS separator, which
+	// JSON escapes on Windows (internal\\service), so a raw Contains check
+	// against filepath.Join(...) would spuriously fail there.
+	var resolved struct {
+		Subpaths []string `json:"subpaths"`
+	}
+	if err := json.Unmarshal(data, &resolved); err != nil {
+		t.Fatalf("decode output %q: %v", string(data), err)
+	}
+	want := filepath.Join("internal", "service")
+	if !slices.Contains(resolved.Subpaths, want) {
+		t.Fatalf("subpaths %v did not contain %q", resolved.Subpaths, want)
 	}
 }
 

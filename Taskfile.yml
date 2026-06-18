@@ -8,6 +8,13 @@
 #   go -C tools tool task <name>
 version: '3'
 
+# Build/test each module standalone (its own go.mod + local replaces), matching
+# how the binaries are released, rather than through the go.work workspace.
+# This also lets `go -C tools tool` resolve the Task tool, which lives outside
+# the workspace. CI sets the same; this keeps direct `task <name>` runs honest.
+env:
+  GOWORK: "off"
+
 vars:
   # Workspace module directories, in dependency order (core first). Keep in
   # sync with go.work.
