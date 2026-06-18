@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: 2026 Skaphos
+# SPDX-License-Identifier: MIT
+
+version: "2"
+
+linters:
+  # Disable the v2 "standard" preset so the enabled set below is the
+  # complete one. Future golangci-lint upgrades won't silently add or
+  # remove linters from CI.
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - unused
+    - misspell
+    - ineffassign
+    - unconvert
+  settings:
+    errcheck:
+      # Writes to an already-acquired stdout/stderr writer in CLI output paths
+      # do not warrant error handling. errcheck stays strict everywhere else
+      # (file/network/store operations).
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+  exclusions:
+    rules:
+      # Tests use patterns where Close/Fprint failures are immaterial;
+      # keep errcheck enabled on production code only.
+      - path: _test\.go
+        linters:
+          - errcheck
+      # The auth commands return multi-line operator guidance as errors
+      # (proper-noun lead, trailing period). ST1005's "no capital / no trailing
+      # punctuation" rule would harm those messages; suppress it there only.
+      - path: internal/authcmd/
+        linters:
+          - staticcheck
+        text: "ST1005:"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+run:
+  timeout: 5m
+  allow-parallel-runners: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

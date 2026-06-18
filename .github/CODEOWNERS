@@ -1,0 +1,6 @@
+# Release and CI configuration is sensitive; require maintainer review.
+/.github/workflows/release-please.yml @mfacenet
+/release-please-config.json          @mfacenet
+/.release-please-manifest.json       @mfacenet
+/.goreleaser.yaml                    @mfacenet
+/.github/workflows/ci.yml            @mfacenet

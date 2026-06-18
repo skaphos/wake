@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: MIT
+#
+# Taskfile for the Wake monorepo. Wake is a go.work workspace of several
+# independent modules; these tasks fan each check out across every module so a
+# single command covers the whole repo.
+#
+# Run through the pinned Task tool (no global install needed):
+#   go -C tools tool task <name>
+version: '3'
+
+vars:
+  # Workspace module directories, in dependency order (core first). Keep in
+  # sync with go.work.
+  MODULES: core cli events-mcp forensics-mcp audit-mcp
+  # Analysis tools, pinned and resolved on demand via `go run`. golangci-lint
+  # bundles staticcheck, govet, errcheck, unused, ineffassign, and more.
+  GOLANGCI: github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+  GOVULNCHECK: golang.org/x/vuln/cmd/govulncheck@v1.4.0
+
+tasks:
+  default:
+    cmds:
+      - task: ci
+
+  fmt:
+    desc: Check gofmt formatting across all modules.
+    cmds:
+      - |
+        set -eu
+        out=$(gofmt -l {{.MODULES}})
+        if [ -n "$out" ]; then
+          echo "gofmt needed for:"; echo "$out"; exit 1
+        fi
+
+  vet:
+    desc: Run go vet across all modules.
+    cmds:
+      - for: { var: MODULES }
+        cmd: (cd {{.ITEM}} && go vet ./...)
+
+  lint:
+    desc: Run golangci-lint (govet, staticcheck, errcheck, unused, …) across all modules.
+    cmds:
+      - for: { var: MODULES }
+        cmd: (cd {{.ITEM}} && go run {{.GOLANGCI}} run ./...)
+
+  vuln:
+    desc: Run govulncheck across all modules.
+    cmds:
+      - for: { var: MODULES }
+        cmd: (cd {{.ITEM}} && go run {{.GOVULNCHECK}} ./...)
+
+  test:
+    desc: Run tests with the race detector across all modules.
+    cmds:
+      - for: { var: MODULES }
+        cmd: (cd {{.ITEM}} && go test -race ./...)
+
+  test-cover:
+    desc: Run tests with coverage across all modules (writes <module>/coverage.out).
+    cmds:
+      - for: { var: MODULES }
+        cmd: (cd {{.ITEM}} && go test -race -covermode=atomic -coverprofile=coverage.out ./...)
+
+  build:
+    desc: Build all modules.
+    cmds:
+      - for: { var: MODULES }
+        cmd: (cd {{.ITEM}} && go build ./...)
+
+  tidy:
+    desc: Tidy go.mod/go.sum across all modules.
+    cmds:
+      - for: { var: MODULES }
+        cmd: (cd {{.ITEM}} && go mod tidy)
+
+  ci:
+    desc: Run the full check set locally (CI parity).
+    cmds:
+      - task: fmt
+      - task: vet
+      - task: lint
+      - task: vuln
+      - task: test
+      - task: build

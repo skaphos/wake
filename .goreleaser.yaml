@@ -1,0 +1,86 @@
+# SPDX-License-Identifier: MIT
+#
+# goreleaser builds and uploads the Wake binaries. release-please owns the
+# version, tag, GitHub release, and CHANGELOG (see .github/workflows/
+# release-please.yml); goreleaser runs after a release is created and appends
+# the built artifacts to it (release.mode: append, changelog disabled).
+#
+# Wake is a go.work workspace of several modules. Each binary is built from its
+# own module directory with GOWORK=off so the module's own go.mod (and its
+# local replace directives) governs the build, independent of the workspace.
+version: 2
+
+project_name: wake
+
+builds:
+  - id: wake
+    dir: cli
+    main: .
+    binary: wake
+    env: [CGO_ENABLED=0, GOWORK=off]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+  - id: wake-events-mcp
+    dir: events-mcp
+    main: .
+    binary: wake-events-mcp
+    env: [CGO_ENABLED=0, GOWORK=off]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+  - id: wake-forensics-mcp
+    dir: forensics-mcp
+    main: .
+    binary: wake-forensics-mcp
+    env: [CGO_ENABLED=0, GOWORK=off]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+  - id: wake-audit-mcp
+    dir: audit-mcp
+    main: .
+    binary: wake-audit-mcp
+    env: [CGO_ENABLED=0, GOWORK=off]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: default
+    # No `builds:` filter, so every binary (wake + the three MCP servers) is
+    # bundled into one archive per OS/arch.
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "wake_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  # release-please owns CHANGELOG.md.
+  disable: true
+
+release:
+  # release-please has already created the GitHub release for this tag;
+  # goreleaser uploads the binaries and checksums onto it.
+  mode: append
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
