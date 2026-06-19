@@ -16,6 +16,7 @@ import (
 	"github.com/skaphos/wake-audit-mcp/source/local"
 	"github.com/skaphos/wake-audit-mcp/source/remote"
 	"github.com/skaphos/wake-core/audit"
+	"github.com/skaphos/wake-core/ownership"
 )
 
 // defaultMaxRepos bounds an org sweep when the caller does not specify a cap,
@@ -26,15 +27,19 @@ const defaultMaxRepos = 300
 // Exactly one target must be given: a local Path, or an Owner+Repo pair for a
 // remote GitHub audit.
 type AuditRepositoryInput struct {
-	Path      string `json:"path,omitempty" jsonschema:"local repository checkout path to audit; mutually exclusive with owner/repo"`
-	Owner     string `json:"owner,omitempty" jsonschema:"GitHub owner or org for a remote audit; requires repo"`
-	Repo      string `json:"repo,omitempty" jsonschema:"GitHub repository name for a remote audit; requires owner"`
-	RulesYAML string `json:"rules_yaml,omitempty" jsonschema:"optional custom rule pack as YAML; defaults to the built-in wake pack"`
+	Path          string `json:"path,omitempty" jsonschema:"local repository checkout path to audit; mutually exclusive with owner/repo"`
+	Owner         string `json:"owner,omitempty" jsonschema:"GitHub owner or org for a remote audit; requires repo"`
+	Repo          string `json:"repo,omitempty" jsonschema:"GitHub repository name for a remote audit; requires owner"`
+	RulesYAML     string `json:"rules_yaml,omitempty" jsonschema:"optional custom rule pack as YAML; defaults to the built-in wake pack"`
+	OrgLayerYAML  string `json:"org_layer_yaml,omitempty" jsonschema:"optional organizational policy layer (add/strengthen/relax edits) applied over the base pack"`
+	TeamLayerYAML string `json:"team_layer_yaml,omitempty" jsonschema:"optional team policy layer applied over the org layer; relax is permitted on soft controls only"`
 }
 
 // RepoResult is the structured output of audit_repository.
 type RepoResult struct {
 	RuleSet string           `json:"rule_set"`
+	Layers  []string         `json:"layers,omitempty"`
+	Waivers []audit.Waiver   `json:"waivers,omitempty"`
 	Report  audit.RepoReport `json:"report"`
 	Summary Summary          `json:"summary"`
 }
@@ -46,6 +51,8 @@ type AuditOrgInput struct {
 	IncludeForks    bool   `json:"include_forks,omitempty" jsonschema:"include forked repositories (excluded by default)"`
 	MaxRepos        int    `json:"max_repos,omitempty" jsonschema:"cap the number of repositories audited after filtering; 0 uses the server default (300); a negative value is rejected"`
 	RulesYAML       string `json:"rules_yaml,omitempty" jsonschema:"optional custom rule pack as YAML; defaults to the built-in wake pack"`
+	OrgLayerYAML    string `json:"org_layer_yaml,omitempty" jsonschema:"optional organizational policy layer (add/strengthen/relax edits) applied over the base pack"`
+	TeamLayerYAML   string `json:"team_layer_yaml,omitempty" jsonschema:"optional team policy layer applied over the org layer; relax is permitted on soft controls only"`
 }
 
 // OrgResult is the structured output of audit_org. ReposAudited counts the
@@ -57,13 +64,55 @@ type OrgResult struct {
 	ReposAudited int                `json:"repos_audited"`
 	ReposSkipped int                `json:"repos_skipped"`
 	Truncated    bool               `json:"truncated"`
+	Layers       []string           `json:"layers,omitempty"`
+	Waivers      []audit.Waiver     `json:"waivers,omitempty"`
 	Summary      Summary            `json:"summary"`
 	Repositories []audit.RepoReport `json:"repositories"`
+}
+
+// AuditTeamsInput is the argument schema for the audit_teams tool. It audits an
+// org like audit_org, then rolls the results up by owning team.
+type AuditTeamsInput struct {
+	Org             string `json:"org" jsonschema:"GitHub organization whose teams and repositories to audit"`
+	IncludeArchived bool   `json:"include_archived,omitempty" jsonschema:"include archived repositories (excluded by default)"`
+	IncludeForks    bool   `json:"include_forks,omitempty" jsonschema:"include forked repositories (excluded by default)"`
+	MaxRepos        int    `json:"max_repos,omitempty" jsonschema:"cap the number of repositories audited after filtering; 0 uses the server default (300); a negative value is rejected"`
+	RulesYAML       string `json:"rules_yaml,omitempty" jsonschema:"optional custom rule pack as YAML; defaults to the built-in wake pack"`
+	OrgLayerYAML    string `json:"org_layer_yaml,omitempty" jsonschema:"optional organizational policy layer applied over the base pack"`
+	TeamLayerYAML   string `json:"team_layer_yaml,omitempty" jsonschema:"optional team policy layer applied over the org layer"`
+	OverridesYAML   string `json:"overrides_yaml,omitempty" jsonschema:"optional ownership overrides (per-repo team attribution GitHub teams miss); extends or replaces host-derived ownership"`
+}
+
+// TeamsResult is the structured output of audit_teams: the policy sweep tallies
+// plus the per-team rollup keyed on which teams own out-of-policy repositories.
+type TeamsResult struct {
+	Org          string           `json:"org"`
+	RuleSet      string           `json:"rule_set"`
+	Layers       []string         `json:"layers,omitempty"`
+	Waivers      []audit.Waiver   `json:"waivers,omitempty"`
+	ReposAudited int              `json:"repos_audited"`
+	ReposSkipped int              `json:"repos_skipped"`
+	Truncated    bool             `json:"truncated"`
+	Summary      Summary          `json:"summary"`
+	Rollup       ownership.Report `json:"rollup"`
 }
 
 // handler holds the dependencies shared across tool calls.
 type handler struct {
 	cfg config.Config
+	// newAPI constructs the remote host API; it is a seam so tests can inject a
+	// fake. When nil it defaults to remote.NewGitHub.
+	newAPI func(token, baseURL string) (remote.API, error)
+}
+
+// makeAPI builds the remote API from the handler's config, using the injected
+// constructor when set and the real GitHub client otherwise.
+func (h *handler) makeAPI() (remote.API, error) {
+	newAPI := h.newAPI
+	if newAPI == nil {
+		newAPI = remote.NewGitHub
+	}
+	return newAPI(h.cfg.GitHubToken, h.cfg.GitHubBaseURL)
 }
 
 // New builds an MCP server exposing the audit tools, configured from cfg.
@@ -97,6 +146,18 @@ func New(cfg config.Config) (*mcp.Server, error) {
 		},
 	}, h.auditOrg)
 
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "audit_teams",
+		Description: "Audit a GitHub organization and roll the results up by owning team. " +
+			"Builds the team↔repo ownership graph from GitHub team assignments (optionally " +
+			"extended by per-repo overrides) and reports which teams own repositories that are " +
+			"out of policy, plus any audited repos no team owns.",
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:  true,
+			OpenWorldHint: boolPtr(true),
+		},
+	}, h.auditTeams)
+
 	return server, nil
 }
 
@@ -105,13 +166,13 @@ func New(cfg config.Config) (*mcp.Server, error) {
 // so the install permissions snippet cannot drift from what the server marks
 // read-only. Every tool audit-mcp exposes is read-only by design.
 func ReadOnlyTools() []string {
-	return []string{"audit_repository", "audit_org"}
+	return []string{"audit_repository", "audit_org", "audit_teams"}
 }
 
 func boolPtr(b bool) *bool { return &b }
 
 func (h *handler) auditRepository(ctx context.Context, _ *mcp.CallToolRequest, in AuditRepositoryInput) (*mcp.CallToolResult, RepoResult, error) {
-	rs, err := resolveRuleSet(in.RulesYAML)
+	ep, err := resolveEffectivePolicy(in.RulesYAML, in.OrgLayerYAML, in.TeamLayerYAML)
 	if err != nil {
 		return errorResult(err), RepoResult{}, nil
 	}
@@ -132,7 +193,7 @@ func (h *handler) auditRepository(ctx context.Context, _ *mcp.CallToolRequest, i
 		tree, err = local.New(in.Path)
 	} else {
 		var api remote.API
-		api, err = remote.NewGitHub(h.cfg.GitHubToken, h.cfg.GitHubBaseURL)
+		api, err = h.makeAPI()
 		if err == nil {
 			tree, err = remote.NewTree(ctx, api, remote.RepoRef{Owner: in.Owner, Name: in.Repo})
 		}
@@ -141,9 +202,15 @@ func (h *handler) auditRepository(ctx context.Context, _ *mcp.CallToolRequest, i
 		return errorResult(err), RepoResult{}, nil
 	}
 
-	report := audit.Evaluate(tree, audit.Classify(tree), rs)
-	out := RepoResult{RuleSet: rs.Name, Report: report, Summary: summarize(report)}
-	return textResult(renderRepo(report, rs.Name)), out, nil
+	report := audit.EvaluatePolicy(tree, audit.Classify(tree), ep)
+	out := RepoResult{
+		RuleSet: ep.RuleSet.Name,
+		Layers:  ep.Layers,
+		Waivers: ep.Waivers,
+		Report:  report,
+		Summary: summarize(report),
+	}
+	return textResult(renderRepo(report, ep.RuleSet.Name)), out, nil
 }
 
 func (h *handler) auditOrg(ctx context.Context, _ *mcp.CallToolRequest, in AuditOrgInput) (*mcp.CallToolResult, OrgResult, error) {
@@ -157,61 +224,124 @@ func (h *handler) auditOrg(ctx context.Context, _ *mcp.CallToolRequest, in Audit
 	if max == 0 {
 		max = defaultMaxRepos
 	}
-	rs, err := resolveRuleSet(in.RulesYAML)
+	ep, err := resolveEffectivePolicy(in.RulesYAML, in.OrgLayerYAML, in.TeamLayerYAML)
 	if err != nil {
 		return errorResult(err), OrgResult{}, nil
 	}
 
-	api, err := remote.NewGitHub(h.cfg.GitHubToken, h.cfg.GitHubBaseURL)
+	api, err := h.makeAPI()
 	if err != nil {
 		return errorResult(err), OrgResult{}, nil
 	}
-	repos, err := api.ListOrgRepos(ctx, in.Org)
+	sweep, err := remote.SweepOrg(ctx, api, in.Org, remote.SweepOptions{
+		IncludeArchived: in.IncludeArchived,
+		IncludeForks:    in.IncludeForks,
+		MaxRepos:        max,
+	}, ep)
 	if err != nil {
 		return errorResult(err), OrgResult{}, nil
 	}
 
-	eligible := remote.EligibleRepos(repos, in.IncludeArchived, in.IncludeForks)
-	truncated := false
-	if len(eligible) > max {
-		eligible = eligible[:max]
-		truncated = true
-	}
-
-	reports := make([]audit.RepoReport, 0, len(eligible))
 	var total Summary
-	audited, skipped := 0, 0
-	for _, ref := range eligible {
-		report := auditOne(ctx, api, ref, rs)
-		if report.Skipped {
-			skipped++
-		} else {
-			audited++
-			total = total.add(summarize(report))
+	for _, r := range sweep.Reports {
+		if !r.Skipped {
+			total = total.add(summarize(r))
 		}
-		reports = append(reports, report)
 	}
 
 	out := OrgResult{
 		Org:          in.Org,
-		RuleSet:      rs.Name,
-		ReposAudited: audited,
-		ReposSkipped: skipped,
-		Truncated:    truncated,
+		RuleSet:      ep.RuleSet.Name,
+		ReposAudited: sweep.Audited,
+		ReposSkipped: sweep.Skipped,
+		Truncated:    sweep.Truncated,
+		Layers:       ep.Layers,
+		Waivers:      ep.Waivers,
 		Summary:      total,
-		Repositories: reports,
+		Repositories: sweep.Reports,
 	}
-	return textResult(renderOrg(in.Org, rs.Name, reports, truncated)), out, nil
+	return textResult(renderOrg(in.Org, ep.RuleSet.Name, sweep.Reports, sweep.Truncated, ep.Waivers)), out, nil
 }
 
-// auditOne audits a single remote repo, converting a fetch failure into a
-// skipped report so one unreachable repo does not abort the whole org sweep.
-func auditOne(ctx context.Context, api remote.API, ref remote.RepoRef, rs audit.RuleSet) audit.RepoReport {
-	tree, err := remote.NewTree(ctx, api, ref)
-	if err != nil {
-		return audit.RepoReport{Repository: ref.FullName(), Skipped: true, SkipReason: err.Error()}
+func (h *handler) auditTeams(ctx context.Context, _ *mcp.CallToolRequest, in AuditTeamsInput) (*mcp.CallToolResult, TeamsResult, error) {
+	if in.Org == "" {
+		return errorResult(fmt.Errorf("org is required")), TeamsResult{}, nil
 	}
-	return audit.Evaluate(tree, audit.Classify(tree), rs)
+	if in.MaxRepos < 0 {
+		return errorResult(fmt.Errorf("max_repos must not be negative")), TeamsResult{}, nil
+	}
+	max := in.MaxRepos
+	if max == 0 {
+		max = defaultMaxRepos
+	}
+	ep, err := resolveEffectivePolicy(in.RulesYAML, in.OrgLayerYAML, in.TeamLayerYAML)
+	if err != nil {
+		return errorResult(err), TeamsResult{}, nil
+	}
+	overrides, err := resolveOverrides(in.OverridesYAML)
+	if err != nil {
+		return errorResult(err), TeamsResult{}, nil
+	}
+
+	api, err := h.makeAPI()
+	if err != nil {
+		return errorResult(err), TeamsResult{}, nil
+	}
+
+	graph, err := remote.BuildOwnershipGraph(ctx, api, in.Org)
+	if err != nil {
+		return errorResult(err), TeamsResult{}, nil
+	}
+	graph.ApplyOverrides(overrides)
+
+	sweep, err := remote.SweepOrg(ctx, api, in.Org, remote.SweepOptions{
+		IncludeArchived: in.IncludeArchived,
+		IncludeForks:    in.IncludeForks,
+		MaxRepos:        max,
+	}, ep)
+	if err != nil {
+		return errorResult(err), TeamsResult{}, nil
+	}
+
+	var total Summary
+	for _, r := range sweep.Reports {
+		if !r.Skipped {
+			total = total.add(summarize(r))
+		}
+	}
+	rollup := ownership.Rollup(graph, sweep.Reports)
+
+	out := TeamsResult{
+		Org:          in.Org,
+		RuleSet:      ep.RuleSet.Name,
+		Layers:       ep.Layers,
+		Waivers:      ep.Waivers,
+		ReposAudited: sweep.Audited,
+		ReposSkipped: sweep.Skipped,
+		Truncated:    sweep.Truncated,
+		Summary:      total,
+		Rollup:       rollup,
+	}
+	return textResult(renderTeams(in.Org, ep.RuleSet.Name, rollup, sweep.Truncated, ep.Layers, ep.Waivers)), out, nil
+}
+
+// resolveOverrides parses the optional ownership-override YAML, returning no
+// overrides when the input is empty.
+func resolveOverrides(overridesYAML string) ([]ownership.Override, error) {
+	if strings.TrimSpace(overridesYAML) == "" {
+		return nil, nil
+	}
+	cfg, err := ownership.LoadOverrides(strings.NewReader(overridesYAML))
+	if err != nil {
+		return nil, err
+	}
+	return cfg.Overrides, nil
+}
+
+// auditOne audits a single remote repo against the effective policy. It is a
+// thin alias over remote.AuditRepo retained for the server's unit tests.
+func auditOne(ctx context.Context, api remote.API, ref remote.RepoRef, ep audit.EffectivePolicy) audit.RepoReport {
+	return remote.AuditRepo(ctx, api, ref, ep)
 }
 
 // resolveRuleSet returns the custom pack parsed from rulesYAML, or the
@@ -221,6 +351,32 @@ func resolveRuleSet(rulesYAML string) (audit.RuleSet, error) {
 		return audit.DefaultRuleSet(), nil
 	}
 	return audit.LoadRuleSet(strings.NewReader(rulesYAML))
+}
+
+// resolveEffectivePolicy composes the base rule pack (from rulesYAML or the
+// built-in default) with the optional organizational and team policy layers,
+// applied in that order, into an EffectivePolicy ready for EvaluatePolicy.
+func resolveEffectivePolicy(rulesYAML, orgLayerYAML, teamLayerYAML string) (audit.EffectivePolicy, error) {
+	base, err := resolveRuleSet(rulesYAML)
+	if err != nil {
+		return audit.EffectivePolicy{}, err
+	}
+	var layers []audit.Layer
+	if strings.TrimSpace(orgLayerYAML) != "" {
+		l, err := audit.LoadLayer(strings.NewReader(orgLayerYAML))
+		if err != nil {
+			return audit.EffectivePolicy{}, fmt.Errorf("org layer: %w", err)
+		}
+		layers = append(layers, l)
+	}
+	if strings.TrimSpace(teamLayerYAML) != "" {
+		l, err := audit.LoadLayer(strings.NewReader(teamLayerYAML))
+		if err != nil {
+			return audit.EffectivePolicy{}, fmt.Errorf("team layer: %w", err)
+		}
+		layers = append(layers, l)
+	}
+	return audit.Resolve(base, layers...)
 }
 
 func textResult(md string) *mcp.CallToolResult {

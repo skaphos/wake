@@ -13,9 +13,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/skaphos/wake-audit-mcp/source/local"
+	"github.com/skaphos/wake-cli/internal/policyfile"
 	"github.com/skaphos/wake-core/audit"
 )
 
@@ -24,9 +24,11 @@ func Run(ctx context.Context, args []string, out, errw io.Writer) error {
 	fs := flag.NewFlagSet("audit", flag.ContinueOnError)
 	fs.SetOutput(errw)
 
-	var format, rulesPath string
+	var format, rulesPath, orgLayerPath, teamLayerPath string
 	fs.StringVar(&format, "format", "markdown", "output format: text | markdown | json")
 	fs.StringVar(&rulesPath, "rules", "", "custom rule pack (YAML); default: the built-in wake pack")
+	fs.StringVar(&orgLayerPath, "org-layer", "", "organizational policy layer (YAML) applied over the base pack")
+	fs.StringVar(&teamLayerPath, "team-layer", "", "team policy layer (YAML) applied over the org layer; relax is permitted on soft controls only")
 	fs.Usage = func() {
 		fmt.Fprintln(errw, "Usage:")
 		fmt.Fprintln(errw, "  wake audit [flags] <repository-path>   audit a local checkout against the policy pack")
@@ -41,22 +43,26 @@ func Run(ctx context.Context, args []string, out, errw io.Writer) error {
 		return fmt.Errorf("audit requires exactly one repository path argument")
 	}
 
-	rs := audit.DefaultRuleSet()
+	base := audit.DefaultRuleSet()
 	if rulesPath != "" {
-		f, err := os.Open(rulesPath)
-		if err != nil {
-			return fmt.Errorf("open rule pack: %w", err)
-		}
-		defer func() { _ = f.Close() }()
-		if rs, err = audit.LoadRuleSet(f); err != nil {
+		var err error
+		if base, err = policyfile.RuleSet(rulesPath); err != nil {
 			return err
 		}
+	}
+	layers, err := policyfile.Layers(orgLayerPath, teamLayerPath)
+	if err != nil {
+		return err
+	}
+	ep, err := audit.Resolve(base, layers...)
+	if err != nil {
+		return fmt.Errorf("resolve policy: %w", err)
 	}
 
 	tree, err := local.New(pos[0])
 	if err != nil {
 		return fmt.Errorf("open repository: %w", err)
 	}
-	report := audit.Evaluate(tree, audit.Classify(tree), rs)
-	return render(out, format, report, rs.Name)
+	report := audit.EvaluatePolicy(tree, audit.Classify(tree), ep)
+	return render(out, format, report, ep.RuleSet.Name)
 }

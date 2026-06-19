@@ -24,3 +24,20 @@ func LoadRuleSet(r io.Reader) (RuleSet, error) {
 	}
 	return rs, nil
 }
+
+// LoadLayer decodes a YAML policy layer (an organizational standard or team
+// layer of add/strengthen/relax edits) and validates it for well-formedness.
+// Edits are validated against a base rule set only at Resolve time, where the
+// target controls are known.
+func LoadLayer(r io.Reader) (Layer, error) {
+	var l Layer
+	dec := yaml.NewDecoder(r)
+	dec.KnownFields(true)
+	if err := dec.Decode(&l); err != nil {
+		return Layer{}, fmt.Errorf("decode policy layer: %w", err)
+	}
+	if err := l.Validate(); err != nil {
+		return Layer{}, fmt.Errorf("invalid policy layer: %w", err)
+	}
+	return l, nil
+}

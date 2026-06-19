@@ -41,6 +41,23 @@ func Evaluate(tree FileTree, cls Classification, rs RuleSet) RepoReport {
 	}
 }
 
+// EvaluatePolicy evaluates the repository against a resolved EffectivePolicy:
+// it runs the effective rule set, stamps each finding with the provenance of
+// the layer that contributed its control, and carries the policy's recorded
+// waivers and layer names into the report so disabled soft controls surface
+// as waivers rather than silent omissions.
+func EvaluatePolicy(tree FileTree, cls Classification, ep EffectivePolicy) RepoReport {
+	report := Evaluate(tree, cls, ep.RuleSet)
+	for i := range report.Findings {
+		if o, ok := ep.Origin[report.Findings[i].ControlID]; ok {
+			report.Findings[i].Origin = o
+		}
+	}
+	report.Waivers = ep.Waivers
+	report.Layers = ep.Layers
+	return report
+}
+
 type evaluator struct {
 	tree   FileTree
 	cls    Classification

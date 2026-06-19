@@ -146,13 +146,16 @@ type RuleSet struct {
 
 // Finding is the evaluated result of one control against one repository.
 type Finding struct {
-	ControlID   string                `json:"control_id"`
-	Title       string                `json:"title"`
-	Kind        ControlKind           `json:"kind"`
-	Severity    Severity              `json:"severity"`
-	Outcome     Outcome               `json:"outcome,omitempty"`
-	Category    string                `json:"category,omitempty"`
-	Evidence    []string              `json:"evidence,omitempty"`
+	ControlID string      `json:"control_id"`
+	Title     string      `json:"title"`
+	Kind      ControlKind `json:"kind"`
+	Severity  Severity    `json:"severity"`
+	Outcome   Outcome     `json:"outcome,omitempty"`
+	Category  string      `json:"category,omitempty"`
+	Evidence  []string    `json:"evidence,omitempty"`
+	// Origin names the policy layer that contributed or last modified this
+	// control during layer resolution (empty for an unlayered audit).
+	Origin      string                `json:"origin,omitempty"`
 	Confidence  confidence.Assessment `json:"confidence"`
 	Remediation string                `json:"remediation,omitempty"`
 }
@@ -162,10 +165,36 @@ type RepoReport struct {
 	Repository     string         `json:"repository"`
 	Classification Classification `json:"classification"`
 	Findings       []Finding      `json:"findings"`
+	// Waivers lists soft controls disabled by a policy layer for this audit,
+	// carried through so the report records them with provenance rather than
+	// silently omitting the control. Populated by EvaluatePolicy.
+	Waivers []Waiver `json:"waivers,omitempty"`
+	// Layers names the resolved policy layers (base first) when the audit ran
+	// against a layered EffectivePolicy.
+	Layers []string `json:"layers,omitempty"`
 	// Skipped repos (archived/forks excluded from scope) carry a reason and
 	// no findings.
 	Skipped    bool   `json:"skipped,omitempty"`
 	SkipReason string `json:"skip_reason,omitempty"`
+}
+
+// HardViolations returns the findings for hard controls that failed — the
+// enforced-floor breaches that put a repository out of policy. (Soft failures
+// are recommendations, not violations.)
+func (r RepoReport) HardViolations() []Finding {
+	var out []Finding
+	for _, f := range r.Findings {
+		if f.Severity == Hard && f.Outcome == OutcomeFail {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// OutOfPolicy reports whether the repository has any hard violation. It is the
+// canonical "out of policy" predicate used by per-team rollups.
+func (r RepoReport) OutOfPolicy() bool {
+	return len(r.HardViolations()) > 0
 }
 
 // RepoInfo describes the repository a FileTree exposes, for eligibility

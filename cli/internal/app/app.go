@@ -14,6 +14,7 @@ import (
 	"github.com/skaphos/wake-cli/internal/analyze"
 	"github.com/skaphos/wake-cli/internal/auditcmd"
 	"github.com/skaphos/wake-cli/internal/authcmd"
+	"github.com/skaphos/wake-cli/internal/teamscmd"
 	"github.com/skaphos/wake-cli/internal/workspace"
 	"github.com/skaphos/wake-forensics-mcp/source"
 )
@@ -28,6 +29,8 @@ func Run(ctx context.Context, args []string) error {
 		return runAnalyze(ctx, args[1:], os.Stdout)
 	case "audit":
 		return auditcmd.Run(ctx, args[1:], os.Stdout, os.Stderr)
+	case "teams":
+		return teamscmd.Run(ctx, args[1:], os.Stdout, os.Stderr)
 	case "auth":
 		return authcmd.Run(ctx, args[1:], os.Stdin, os.Stdout, os.Stderr)
 	case "help", "-h", "--help":
@@ -172,6 +175,12 @@ Commands:
                    (CI/CD, unit tests, quality gate, deployment intent):
                      wake audit <path>                    local checkout
                      wake audit --rules pack.yaml <path>  custom policy pack
+                     wake audit --org-layer o.yaml --team-layer t.yaml <path>
+                                                          layered (default⊕org⊕team)
+  teams --org <o>  Audit a GitHub org and roll policy results up by owning team
+                   (which teams own repos out of policy):
+                     wake teams --org acme
+                     wake teams --org acme --overrides own.yaml  attribution overrides
   auth <provider>  Authenticate with GitHub or GitLab (OAuth). Subcommands:
                      wake auth github | gitlab | status | logout
   version          Print the CLI version.

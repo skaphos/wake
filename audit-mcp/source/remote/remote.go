@@ -27,6 +27,13 @@ type RepoRef struct {
 // FullName is "owner/name".
 func (r RepoRef) FullName() string { return r.Owner + "/" + r.Name }
 
+// Team identifies an organization team by its slug (the stable, URL-safe
+// identifier) and its human-readable name.
+type Team struct {
+	Slug string
+	Name string
+}
+
 // API is the minimal remote-host surface the audit needs. It is abstracted
 // so the FileTree logic is testable without network access; ghAPI is the
 // go-github-backed implementation.
@@ -39,6 +46,10 @@ type API interface {
 	Content(ctx context.Context, r RepoRef, path string) ([]byte, error)
 	// ListOrgRepos enumerates an organization's repositories.
 	ListOrgRepos(ctx context.Context, org string) ([]RepoRef, error)
+	// ListTeams enumerates an organization's teams.
+	ListTeams(ctx context.Context, org string) ([]Team, error)
+	// ListTeamRepos enumerates the repositories assigned to one team.
+	ListTeamRepos(ctx context.Context, org, teamSlug string) ([]RepoRef, error)
 }
 
 // Tree is an audit.FileTree for one remote repository. Paths are fetched

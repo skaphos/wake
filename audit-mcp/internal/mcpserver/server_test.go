@@ -106,10 +106,12 @@ func TestAuditRepository_BadRulePack(t *testing.T) {
 
 // fakeAPI implements remote.API in memory for org/remote tests without HTTP.
 type fakeAPI struct {
-	trees   map[string][]string
-	content map[string]map[string]string
-	org     []remote.RepoRef
-	treeErr map[string]error
+	trees     map[string][]string
+	content   map[string]map[string]string
+	org       []remote.RepoRef
+	treeErr   map[string]error
+	teams     []remote.Team
+	teamRepos map[string][]remote.RepoRef
 }
 
 func (f *fakeAPI) Tree(_ context.Context, r remote.RepoRef) ([]string, bool, error) {
@@ -127,6 +129,14 @@ func (f *fakeAPI) ListOrgRepos(_ context.Context, _ string) ([]remote.RepoRef, e
 	return f.org, nil
 }
 
+func (f *fakeAPI) ListTeams(_ context.Context, _ string) ([]remote.Team, error) {
+	return f.teams, nil
+}
+
+func (f *fakeAPI) ListTeamRepos(_ context.Context, _, teamSlug string) ([]remote.RepoRef, error) {
+	return f.teamRepos[teamSlug], nil
+}
+
 func ciTree() ([]string, map[string]string) {
 	return []string{"go.mod", "main.go", ".github/workflows/ci.yml"},
 		map[string]string{".github/workflows/ci.yml": "steps:\n  - run: go test ./...\n"}
@@ -138,7 +148,7 @@ func TestAuditOne_Success(t *testing.T) {
 		trees:   map[string][]string{"acme/svc": paths},
 		content: map[string]map[string]string{"acme/svc": content},
 	}
-	rep := auditOne(context.Background(), api, remote.RepoRef{Owner: "acme", Name: "svc"}, audit.DefaultRuleSet())
+	rep := auditOne(context.Background(), api, remote.RepoRef{Owner: "acme", Name: "svc"}, audit.EffectivePolicy{RuleSet: audit.DefaultRuleSet()})
 	if rep.Skipped {
 		t.Fatalf("unexpected skip: %s", rep.SkipReason)
 	}
@@ -152,7 +162,7 @@ func TestAuditOne_Success(t *testing.T) {
 
 func TestAuditOne_FetchErrorBecomesSkip(t *testing.T) {
 	api := &fakeAPI{treeErr: map[string]error{"acme/down": context.DeadlineExceeded}}
-	rep := auditOne(context.Background(), api, remote.RepoRef{Owner: "acme", Name: "down"}, audit.DefaultRuleSet())
+	rep := auditOne(context.Background(), api, remote.RepoRef{Owner: "acme", Name: "down"}, audit.EffectivePolicy{RuleSet: audit.DefaultRuleSet()})
 	if !rep.Skipped || rep.SkipReason == "" {
 		t.Errorf("want skipped report with reason, got %+v", rep)
 	}
@@ -194,7 +204,7 @@ func TestRenderOrg_Truncated(t *testing.T) {
 		{Repository: "acme/a", Classification: audit.Classification{Archetype: audit.ArchetypeService}},
 		{Repository: "acme/b", Skipped: true, SkipReason: "unreachable"},
 	}
-	md := renderOrg("acme", "wake", reports, true)
+	md := renderOrg("acme", "wake", reports, true, nil)
 	if !strings.Contains(md, "acme/a") || !strings.Contains(md, "_skipped_") {
 		t.Errorf("org markdown missing rows: %q", md)
 	}
@@ -210,7 +220,7 @@ func TestRenderOrg_Truncated(t *testing.T) {
 
 func TestReadOnlyTools(t *testing.T) {
 	got := ReadOnlyTools()
-	want := []string{"audit_repository", "audit_org"}
+	want := []string{"audit_repository", "audit_org", "audit_teams"}
 
 	counts := map[string]int{}
 	for _, n := range got {
