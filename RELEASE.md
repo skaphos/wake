@@ -49,7 +49,7 @@ The release workflow mints a GitHub App token for the Skaphos release bot:
 
 | Name | Type | Purpose |
 | --- | --- | --- |
-| `RELEASE_BOT_APP_ID` | repository or organization **variable** | App ID for `actions/create-github-app-token`. |
+| `RELEASE_BOT_CLIENT_ID` | repository or organization **variable** | Client ID for `actions/create-github-app-token`. |
 | `RELEASE_BOT_PRIVATE_KEY` | repository or organization **secret** | Private key for the release bot GitHub App. |
 
 The bot needs `contents: write` and `pull-requests: write` so it can open the

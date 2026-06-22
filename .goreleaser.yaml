@@ -57,6 +57,34 @@ builds:
       - -s -w
     mod_timestamp: "{{ .CommitTimestamp }}"
 
+# macOS code signing + notarization, cross-platform via quill (no Mac runner
+# required). Auto-skipped unless all five MACOS_* secrets are set, so local/
+# snapshot builds and forks without the secrets are unaffected. Runs after build
+# and before archive, so the signed+notarized binaries are what get tarred,
+# checksummed, and uploaded.
+notarize:
+  macos:
+    - enabled: >-
+        {{ and (isEnvSet "MACOS_SIGN_P12") (isEnvSet "MACOS_SIGN_PASSWORD")
+        (isEnvSet "MACOS_NOTARY_ISSUER_ID") (isEnvSet "MACOS_NOTARY_KEY_ID")
+        (isEnvSet "MACOS_NOTARY_KEY") }}
+      ids:
+        - wake
+        - wake-events-mcp
+        - wake-forensics-mcp
+        - wake-audit-mcp
+      sign:
+        # base64-encoded Developer ID Application .p12 (certificate + private key)
+        certificate: "{{ .Env.MACOS_SIGN_P12 }}"
+        password: "{{ .Env.MACOS_SIGN_PASSWORD }}"
+      notarize:
+        # App Store Connect API key (issuer UUID, key ID, base64-encoded .p8)
+        issuer_id: "{{ .Env.MACOS_NOTARY_ISSUER_ID }}"
+        key_id: "{{ .Env.MACOS_NOTARY_KEY_ID }}"
+        key: "{{ .Env.MACOS_NOTARY_KEY }}"
+        wait: true
+        timeout: 20m
+
 archives:
   - id: default
     # No `builds:` filter, so every binary (wake + the three MCP servers) is
