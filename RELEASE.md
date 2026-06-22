@@ -40,8 +40,11 @@ workspace (all modules build at that version). Release Please owns
 `CHANGELOG.md` — do not hand-edit generated release entries except to fix
 clear mistakes before merging the release PR.
 
-While the version is pre-1.0, `feat:` bumps the minor and `fix:` bumps the
-patch (`bump-minor-pre-major`).
+The first release is pinned to `v0.1.0` with `initial-version` so Release
+Please does not bootstrap the project as `v1.0.0`. While the version is
+pre-1.0, breaking changes stay on the `0.x` line by bumping the minor version,
+and `feat:`/`fix:` changes bump the patch version
+(`bump-minor-pre-major`, `bump-patch-for-minor-pre-major`).
 
 ## Required credentials
 
