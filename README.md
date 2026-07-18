@@ -25,3 +25,9 @@ builds independently).
 go build ./...    # from a module directory, or use package patterns from the repo root
 go test  ./...
 ```
+
+---
+
+Skaphos is a project of [Rillan AI LLC](https://skaphos.io), a Missouri
+limited liability company. © 2026 Rillan AI LLC. Released under
+the [MIT License](./LICENSE).
